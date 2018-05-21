@@ -19,7 +19,7 @@ public class GlyphLoader {
 	 */
 	public GlyphLoader(String filename){
 		this.filename = filename;
-		this.edgeIndex = 0;
+		this.edgeIndex = 1;
 	}
 	
 	/**
@@ -36,7 +36,8 @@ public class GlyphLoader {
 		EntryMap<EntryCircle> circles = new EntryMap<EntryCircle>();
 		List<EntryMap<EntryEdge>> edges = new ArrayList<EntryMap<EntryEdge>>();    //Need to make a list of edge lists
 		
-		int lineNumber = 0;
+		int lineNumber = 1;
+		
 		while(fin.hasNextLine()) {
 			String[] cur = fin.nextLine().split("[\\s,;\\t]+");
 			
@@ -55,6 +56,7 @@ public class GlyphLoader {
 					throw new InvalidLayoutException("Invalid color format", lineNumber);
 				}
 			}
+			
 			else if(cur[0].equals("v")) {
 				//create vertex
 				try {
@@ -65,6 +67,7 @@ public class GlyphLoader {
 					throw new InvalidLayoutException("Invalid vertex format", lineNumber);
 				}
 			}
+			
 			else if(cur[0].equals("o")) {
 				//create circle
 				try {
@@ -75,18 +78,25 @@ public class GlyphLoader {
 					throw new InvalidLayoutException("Invalid circle format", lineNumber);
 				}
 			}
+			
 			else if(cur[0].equals("e")) {
 				//create edge
 				EntryVertex pastVertex;
 				EntryMap<EntryEdge> currentEdgeList = new EntryMap<EntryEdge>();
-				while(fin.hasNextLine() && cur[0] == "e") {
+				while(fin.hasNextLine() && cur[0].equals("e")) {
 					pastVertex = vertices.getEntry(Integer.parseInt(cur[1]));
-					cur = fin.nextLine().split(",");
-					currentEdgeList.addEntry(new EntryEdge(edgeIndex, pastVertex, 
-							vertices.getEntry(Integer.parseInt(cur[1])), colors.getEntry(Integer.parseInt(cur[2]))));
+					cur = fin.nextLine().split("[\\s,;\\t]+");
+					lineNumber++;
+					if(cur.length == 0 || !cur[0].equals("e")) {
+						break;
+					}
+					currentEdgeList.addEntry(new EntryEdge(edgeIndex, pastVertex, vertices.getEntry(Integer.parseInt(cur[1])), 
+							colors.getEntry(Integer.parseInt(cur[2]))));
+					edgeIndex++;
 				}
-				edgeIndex++;
+				edges.add(currentEdgeList);
 			}
+			
 			else if(cur[0].equals(",") || cur[0].equals(";") || cur[0].equals(" ") || cur[0].equals("")) {
 				//skip
 			}
