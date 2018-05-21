@@ -1,128 +1,103 @@
 package acg.architecture.view.glyph.loader;
 
 import java.awt.Color;
-import java.io.*;
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Scanner;
 
 public class GlyphLoader {
-	
+
 	private String filename;
-	private Scanner fin;
-	private int edgeIndex;
 	
-	/**
-	 * GlyphLoader explicit value constructor
-	 * @param filename fully qualified filename of the definition file
-	 */
-	public GlyphLoader(String filename){
+	public GlyphLoader(String filename)
+	{
 		this.filename = filename;
-		this.edgeIndex = 1;
 	}
 	
-	/**
-	 * Loads and processes the layout file
-	 * @return layout bundle containing the edges and circles
-	 * @throws IOException
-	 * @throws InvalidLayoutException
-	 */
-	public LayoutBundle load() throws IOException, InvalidLayoutException{
-		openInputFile();
+	public LayoutBundle load() throws IOException, InvalidLayoutException
+	{
+		File file = new File(filename);
+		Scanner scan = new Scanner(file);
 		
-		EntryMap<EntryColor> colors = new EntryMap<EntryColor>();
-		EntryMap<EntryVertex> vertices = new EntryMap<EntryVertex>();
 		EntryMap<EntryCircle> circles = new EntryMap<EntryCircle>();
-		List<EntryMap<EntryEdge>> edges = new ArrayList<EntryMap<EntryEdge>>();    //Need to make a list of edge lists
+		EntryMap<EntryColor> colors = new EntryMap<EntryColor>();
+		EntryMap<EntryEdge> edges = new EntryMap<EntryEdge>();
+		EntryMap<EntryVertex> vertices = new EntryMap<EntryVertex>();
+		ArrayList<EntryMap<EntryEdge>> listofedges = new ArrayList<EntryMap<EntryEdge>>();
 		
-		int lineNumber = 1;
+		int con = -1, line = 1, circle_index = 1, vert_index = 1, edge_index = 1;
 		
-		while(fin.hasNextLine()) {
-			String[] cur = fin.nextLine().split("[\\s,;\\t]+");
-			
-			//trailing comma case
-			if(cur.length == 0 && fin.hasNextLine()) {
-				lineNumber++;
-				continue;
-			}
-			
-			if(cur[0].equals("c")) {
-				//create color
-				try {
-					colors.addEntry(new EntryColor(Integer.parseInt(cur[1]), Color.decode(cur[2]))); //FIX
+		while (scan.hasNextLine())
+		{
+			try
+			{
+				String temp = "";
+				String[] ar = scan.nextLine().split(";");	//split on comments
+				temp = ar[0]; 								//string equals everything before comments
+				ar = temp.split(",");						//split on commas
+				System.out.print(line);
+				for (int j = 0; j < ar.length; j++)
+					System.out.print(": " + ar[j] + " ");
+				System.out.print("\n");
+				
+				if (ar == null || ar.length < 1 || ar[0] == null || ar[0].isEmpty())
+					con = -1;
+				else if (ar[0].equals("c"))
+				{
+					colors.addEntry(new EntryColor(Integer.parseInt(ar[1]), Color.decode(ar[2])));
+					con = -1;
 				}
-				catch(Exception e) {
-					throw new InvalidLayoutException("Invalid color format", lineNumber);
+				else if (ar[0].equals("v"))
+				{
+					vertices.addEntry(new EntryVertex(Integer.parseInt(ar[1]), Double.parseDouble(ar[2]), Double.parseDouble(ar[3]), Double.parseDouble(ar[4])));
+					con = -1;
 				}
-			}
-			
-			else if(cur[0].equals("v")) {
-				//create vertex
-				try {
-					vertices.addEntry(new EntryVertex(Integer.parseInt(cur[1]), Double.parseDouble(cur[2]), 
-							Double.parseDouble(cur[3]), Double.parseDouble(cur[4])));
+				else if (ar[0].equals("o"))
+				{
+					circles.addEntry(new EntryCircle(circle_index, vertices.getEntry(Integer.parseInt(ar[1])), Double.parseDouble(ar[3]), colors.getEntry(Integer.parseInt(ar[2]))));
+					circle_index++;
+					con = -1;
 				}
-				catch(Exception e) {
-					throw new InvalidLayoutException("Invalid vertex format", lineNumber);
-				}
-			}
-			
-			else if(cur[0].equals("o")) {
-				//create circle
-				try {
-					circles.addEntry(new EntryCircle(Integer.parseInt(cur[1]), vertices.getEntry(Integer.parseInt(cur[1])), 
-							Double.parseDouble(cur[3]), colors.getEntry(Integer.parseInt(cur[2]))));
-				}
-				catch(Exception e) {
-					throw new InvalidLayoutException("Invalid circle format", lineNumber);
-				}
-			}
-			
-			else if(cur[0].equals("e")) {
-				//create edge
-				EntryVertex pastVertex;
-				EntryMap<EntryEdge> currentEdgeList = new EntryMap<EntryEdge>();
-				while(fin.hasNextLine() && cur[0].equals("e")) {
-					pastVertex = vertices.getEntry(Integer.parseInt(cur[1]));
-					cur = fin.nextLine().split("[\\s,;\\t]+");
-					lineNumber++;
-					if(cur.length == 0 || !cur[0].equals("e")) {
-						break;
+				else if (ar[0].equals("e"))
+				{
+					if (con != -1)
+					{
+						edges.addEntry(new EntryEdge(edge_index, vertices.getEntry(vert_index), vertices.getEntry(Integer.parseInt(ar[1])), colors.getEntry(Integer.parseInt(ar[2]))));
+						vert_index = Integer.parseInt(ar[1]);
+						edge_index++;
 					}
-					currentEdgeList.addEntry(new EntryEdge(edgeIndex, pastVertex, vertices.getEntry(Integer.parseInt(cur[1])), 
-							colors.getEntry(Integer.parseInt(cur[2]))));
-					edgeIndex++;
+					else
+					{
+						if (edges.getEntries(false).size() > 0)
+							listofedges.add(edges);				//add edge to list of edges
+						edges = new EntryMap<EntryEdge>();		//create new edge list
+						vert_index = Integer.parseInt(ar[1]);
+					}
+					con = Integer.parseInt(ar[1]);	
 				}
-				edges.add(currentEdgeList);
+				else
+					con = -1;
+				
+				line++;
 			}
-			
-			else if(cur[0].equals(",") || cur[0].equals(";") || cur[0].equals(" ") || cur[0].equals("")) {
-				//skip
+			catch(Exception e)
+			{
+				scan.close();
+				e.printStackTrace(System.out);
+				throw new InvalidLayoutException(line);
 			}
-			else {
-				System.out.println(lineNumber);
-				throw new InvalidLayoutException("Invalid argument", lineNumber);
-			}
-			lineNumber++;
 		}
+		scan.close();
 		
-		List<EntryCircle> circleList = circles.getEntries(true);
-		List<List<EntryEdge>> edgeList = new ArrayList<List<EntryEdge>>();
-		Iterator<EntryMap<EntryEdge>> itr = edges.iterator();
-		while(itr.hasNext()) {
-			edgeList.add(itr.next().getEntries(true));
-		}
+		List<List<EntryEdge>> mirror_edges = new ArrayList<List<EntryEdge>>();
+		List<EntryCircle> mirror_circles = new ArrayList<EntryCircle>();
 		
-		return new LayoutBundle(edgeList, circleList);
-	}
-	
-	/**
-	 * Opens input file
-	 * @param filename the name of the file to be opened
-	 * @return
-	 */
-	private void openInputFile() throws IOException{
-		this.fin = new Scanner(new File(this.filename));
+		for (EntryMap<EntryEdge> map : listofedges)
+			mirror_edges.add(map.getEntries(false));
+		mirror_circles = circles.getEntries(false);
+		
+		return new LayoutBundle(mirror_edges, mirror_circles);
 	}
 }
